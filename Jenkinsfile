@@ -16,7 +16,7 @@ pipeline {
 
     stage('Run Tests') {
       steps {
-        // Continue even if snyk test fails
+        // Continue even if snyk test asks for auth / fails
         bat 'cmd /c npm test || exit /b 0'
       }
     }
@@ -37,8 +37,29 @@ pipeline {
     stage('SonarCloud Analysis') {
       steps {
         withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+          // Pure cmd + curl + Expand-Archive, no PowerShell multi-line
           bat """
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ver='5.0.1.3006'; $zip='sonar-scanner.zip'; Invoke-WebRequest -Uri ('https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-'+$ver+'-windows.zip') -OutFile $zip; if (Test-Path sonar-scanner) { Remove-Item -Recurse -Force sonar-scanner }; if (Test-Path $zip) { Expand-Archive -Path $zip -DestinationPath . -Force }; $dir = Get-ChildItem -Directory | Where-Object { \$_.Name -like 'sonar-scanner-*windows' } | Select-Object -First 1; if (-not $dir) { Write-Error 'Sonar scanner folder not found'; exit 1 }; $env:SONAR_SCANNER_OPTS='-Xmx512m'; & (Join-Path $dir.FullName 'bin/sonar-scanner.bat') -Dsonar.login=%SONAR_TOKEN%"
+IF EXIST sonar-scanner RMDIR /S /Q sonar-scanner
+IF EXIST sonar-scanner.zip DEL /F /Q sonar-scanner.zip
+
+curl -L -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-windows.zip
+
+REM Expand the zip (PowerShell Expand-Archive is safe as a single, simple call)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path 'sonar-scanner.zip' -DestinationPath . -Force"
+
+REM Detect the extracted folder name
+FOR /D %%D IN (sonar-scanner-*-windows) DO SET SCANDIR=%%D
+
+IF NOT DEFINED SCANDIR (
+  ECHO [ERROR] Sonar scanner folder not found after unzip
+  DIR
+  EXIT /B 1
+)
+
+SET SONAR_SCANNER_OPTS=-Xmx512m
+
+REM Run the scanner with the token from Jenkins credentials
+CALL "%SCANDIR%\\bin\\sonar-scanner.bat" -D"sonar.login=%SONAR_TOKEN%"
 """
         }
       }
