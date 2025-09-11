@@ -16,22 +16,20 @@ pipeline {
 
     stage('Run Tests') {
       steps {
-        // Continue even if tests fail or need auth (e.g., snyk test)
-        bat 'cmd /c npm test || exit /b 0'
+        sh 'npm test || true' // Allows pipeline to continue despite test failures
       }
     }
 
     stage('Generate Coverage Report') {
       steps {
-        // Continue even if the project has no "coverage" script
-        bat 'cmd /c npm run coverage || exit /b 0'
+        // Ensure coverage report exists
+ 	sh 'npm run coverage || true'
       }
     }
 
     stage('NPM Audit (Security Scan)') {
       steps {
-        // Show vulnerabilities but don't fail the build
-        bat 'cmd /c npm audit || exit /b 0'
+         sh 'npm audit || true' // This will show known CVEs in the output
       }
     }
 
