@@ -16,14 +16,14 @@ pipeline {
 
     stage('Run Tests') {
       steps {
-        // Continue even if tests fail or need auth (e.g., snyk test)
+        // Allow pipeline to continue even if tests fail or need auth (e.g., snyk test)
         bat 'cmd /c npm test || exit /b 0'
       }
     }
 
     stage('Generate Coverage Report') {
       steps {
-        // Continue even if the project has no "coverage" script
+        // Continue even if there is no "coverage" script
         bat 'cmd /c npm run coverage || exit /b 0'
       }
     }
@@ -39,8 +39,8 @@ pipeline {
       steps {
         // Requires a Secret Text credential in Jenkins with ID = SONAR_TOKEN
         withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-          // Uses pre-installed SonarScanner CLI on PATH
-          bat 'sonar-scanner -D"sonar.login=%SONAR_TOKEN%"'
+          // SonarScanner CLI must be installed and on PATH (e.g., C:\sonar-scanner\...\bin)
+          bat 'sonar-scanner -D"sonar.token=%SONAR_TOKEN%"'
         }
       }
     }
